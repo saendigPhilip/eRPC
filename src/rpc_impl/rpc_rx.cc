@@ -19,7 +19,8 @@ void Rpc<TTr>::process_comps_st() {
     auto *pkthdr = reinterpret_cast<pkthdr_t *>(rx_ring[rx_ring_head]);
     rx_ring_head = (rx_ring_head + 1) % Transport::kNumRxRingEntries;
 
-    assert(pkthdr->check_magic());
+    if (!pkthdr->check_magic())
+        continue;
     assert(pkthdr->msg_size <= kMaxMsgSize);  // msg_size can be 0 here
 
     Session *session = session_vec[pkthdr->dest_session_num];
