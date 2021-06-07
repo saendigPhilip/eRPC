@@ -13,6 +13,8 @@ add_definitions(-Wno-unused-function -Wno-nested-anon-types -Wno-keyword-macro)
 
 set(LIBRARIES ${LIBRARIES} rt numa pthread gflags)
 
+set(DPDK_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../dpdk/x86_64-native-linuxapp-gcc)
+
 # Unit tests
 enable_testing()
 find_package(GTest REQUIRED)
@@ -164,19 +166,16 @@ message(STATUS "Selected transport = ${TRANSPORT}.")
 set(CONFIG_IS_ROCE false)
 
 if(TRANSPORT STREQUAL "dpdk")
-  find_library(DPDK_LIB dpdk)
-  if(NOT DPDK_LIB)
-    message(FATAL_ERROR "DPDK library not found")
-  endif()
+  set(DPDK_LIB ${DPDK_PATH}/lib/libdpdk.a)
 
-  set(LIBRARIES ${LIBRARIES} dpdk dl)
+  set(LIBRARIES ${LIBRARIES} -L${DPDK_PATH}/lib/ dpdk dl)
   set(CONFIG_TRANSPORT "DpdkTransport")
   set(CONFIG_HEADROOM 40)
 
   # DPDK include directory. Locating rte_config.h does not work on some systems.
   # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
   # from the real DPDK include directory (/usr/include/dpdk/).
-  find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
+  set(DPDK_INCLUDE_DIR ${DPDK_PATH}/include/)
   if (DPDK_INCLUDE_DIR)
     message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
   else()
