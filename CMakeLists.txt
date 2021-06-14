@@ -35,6 +35,7 @@ set(TRANSPORT "dpdk" CACHE STRING "Datapath transport (infiniband/raw/dpdk)")
 option(ROCE "Use RoCE if TRANSPORT is infiniband" OFF)
 option(AZURE "Configure DPDK for Azure if TRANSPORT is dpdk" OFF)
 option(PERF "Compile for performance" ON)
+option(SCONE "Compile for use with SCONE" OFF)
 set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
 set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/reorder/trace/cc)") 
 
@@ -48,6 +49,11 @@ else(PERF)
   set(DEBUG ON)
   set(TESTING ON)
 endif(PERF)
+
+if (SCONE)
+  message(STATUS "Compiling for use with SCONE")
+  add_definitions(-DUSE_SCONE)
+endif(SCONE)
 
 # Profile-guided optimization
 if(PGO STREQUAL "generate")
