@@ -10,7 +10,8 @@ set(CMAKE_CXX_COMPILER g++)
 add_definitions(-std=c++11 -march=native -fPIC)
 add_definitions(-Wall -Wextra -Werror -pedantic -Wsign-conversion)
 add_definitions(-Wno-unused-function -Wno-nested-anon-types 
-  -Wno-keyword-macro -Wno-deprecated-declarations -Wno-address-of-packed-member)
+  -Wno-keyword-macro -Wno-deprecated-declarations -Wno-address-of-packed-member
+  -Wno-format -Wno-format-security)
 
 set(LIBRARIES ${LIBRARIES} rt numa pthread gflags)
 
