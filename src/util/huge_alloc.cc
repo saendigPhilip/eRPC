@@ -1,6 +1,16 @@
 #include "huge_alloc.h"
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <iostream>
 #include "util/logger.h"
+
+
+#define SYS_untrusted_mmap 1025
+static void * scone_kernel_mmap(void * addr, size_t length, int prot, int flags, int fd, off_t offset) {
+  return (void*)syscall(SYS_untrusted_mmap, addr, length, prot, flags, fd, offset);
+}
 
 namespace erpc {
 
@@ -59,34 +69,32 @@ void HugeAlloc::print_stats() {
   }
 }
 
+
 Buffer HugeAlloc::alloc_raw(size_t size, DoRegister do_register) {
+  std::cout << "SCONE_MMAP" << "\n";
   std::ostringstream xmsg;  // The exception message
   size = round_up<kHugepageSize>(size);
-  int shm_key, shm_id;
-
+  void* alloc_mem;
   while (true) {
-    // Choose a positive SHM key. Negative is fine but it looks scary in the
-    // error message.
-    shm_key = static_cast<int>(slow_rand.next_u64());
-    shm_key = std::abs(shm_key);
+    // NOT WORKING alloc_mem = scone_kernel_mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS |  MAP_HUGETLB |  MAP_HUGE_2MB, -1, 0);
+    auto mem = open("/dev/zero", O_RDWR);
+    if (mem == -1) {
+      rt_assert("FUCK SCONE!!");
+    }
+    alloc_mem = scone_kernel_mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE, mem, 0);
 
-    // Try to get an SHM region
-    shm_id = shmget(shm_key, size, IPC_CREAT | IPC_EXCL | 0666 | SHM_HUGETLB);
-
-    if (shm_id == -1) {
+    if (alloc_mem == MAP_FAILED) {
       switch (errno) {
         case EEXIST:
           continue;  // shm_key already exists. Try again.
-
         case EACCES:
           xmsg << "eRPC HugeAlloc: SHM allocation error. "
                << "Insufficient permissions.";
           throw std::runtime_error(xmsg.str());
 
         case EINVAL:
-          xmsg << "eRPC HugeAlloc: SHM allocation error: SHMMAX/SHMIN "
-               << "mismatch. size = " << std::to_string(size) << " ("
-               << std::to_string(size / MB(1)) << " MB).";
+          xmsg << "eRPC HugeAlloc: mmap() failed with EINVAL ("
+               << std::to_string(size / MB(1)) << ") MB).";
           throw std::runtime_error(xmsg.str());
 
         case ENOMEM:
@@ -94,6 +102,7 @@ Buffer HugeAlloc::alloc_raw(size_t size, DoRegister do_register) {
           ERPC_WARN(
               "eRPC HugeAlloc: Insufficient hugepages. Can't reserve %lu MB.\n",
               size / MB(1));
+          print_stats();
           return Buffer(nullptr, 0, 0);
 
         default:
@@ -107,33 +116,33 @@ Buffer HugeAlloc::alloc_raw(size_t size, DoRegister do_register) {
     }
   }
 
-  uint8_t *shm_buf = static_cast<uint8_t *>(shmat(shm_id, nullptr, 0));
-  rt_assert(shm_buf != nullptr,
-            "eRPC HugeAlloc: shmat() failed. Key = " + std::to_string(shm_key));
+  uint8_t *shm_buf = static_cast<uint8_t *>(alloc_mem);
+  rt_assert(shm_buf != nullptr, "eRPC HugeAlloc: shmat() failed\n");
 
-  // Mark the SHM region for deletion when this process exits
-  shmctl(shm_id, IPC_RMID, nullptr);
 
   // Bind the buffer to the NUMA node
-  const unsigned long nodemask = (1ul << static_cast<unsigned long>(numa_node));
-  long ret = mbind(shm_buf, size, MPOL_BIND, &nodemask, 32, 0);
-  rt_assert(ret == 0,
-            "eRPC HugeAlloc: mbind() failed. Key " + std::to_string(shm_key));
+  // const unsigned long nodemask = (1ul << static_cast<unsigned long>(numa_node));
 
   // If we are here, the allocation succeeded.  Register if needed.
   bool do_register_bool = (do_register == DoRegister::kTrue);
   Transport::MemRegInfo reg_info;
   if (do_register_bool) reg_info = reg_mr_func(shm_buf, size);
-
+  static int shm_key = 0;
+  shm_key++;
   // Save the SHM region so we can free it later
-  shm_list.push_back(
-      shm_region_t(shm_key, shm_buf, size, do_register_bool, reg_info));
-  stats.shm_reserved += size;
+  shm_list.push_back(                                                                   
+             shm_region_t(shm_key, shm_buf, size, do_register_bool, reg_info));
 
-  // buffer.class_size is invalid because we didn't allocate from a class
-  return Buffer(shm_buf, SIZE_MAX,
-                do_register_bool ? reg_info.lkey : UINT32_MAX);
+  stats.shm_reserved += size;                                                           
+
+  // print_stats();                                                                                 
+
+  // buffer.class_size is invalid because we didn't allocate from a class               
+
+  return Buffer(shm_buf, SIZE_MAX,                                                      
+      do_register_bool ? reg_info.lkey : UINT32_MAX);                       
 }
+
 
 Buffer HugeAlloc::alloc(size_t size) {
   assert(size <= kMaxClassSize);

@@ -8,8 +8,9 @@ include(CMakeDependentOption)
 set(CMAKE_CXX_COMPILER g++)
 
 add_definitions(-std=c++11 -march=native)
-add_definitions(-Wall -Wextra -Werror -pedantic -Wsign-conversion -Wold-style-cast)
-add_definitions(-Wno-unused-function -Wno-nested-anon-types -Wno-keyword-macro -Wno-deprecated-declarations)
+add_definitions(-Wall -Wextra -Werror -pedantic -Wsign-conversion)
+add_definitions(-Wno-unused-function -Wno-nested-anon-types 
+  -Wno-keyword-macro -Wno-deprecated-declarations -Wno-address-of-packed-member)
 
 set(LIBRARIES ${LIBRARIES} rt numa pthread gflags)
 
