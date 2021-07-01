@@ -9,7 +9,9 @@ set(CMAKE_CXX_COMPILER g++)
 
 add_definitions(-std=c++11 -march=native -g -fPIC)
 add_definitions(-Wall -Wextra -pedantic -Wsign-conversion -Wold-style-cast)
-add_definitions(-Wno-unused-function -Wno-nested-anon-types -Wno-keyword-macro)
+add_definitions(-Wno-unused-function -Wno-nested-anon-types -Wno-keyword-macro
+  -Wno-deprecated-declarations -Wno-parentheses -Wno-format -Wno-format-security)
+add_definitions(-msse4.1)
 
 set(LIBRARIES ${LIBRARIES} rt numa pthread gflags)
 
@@ -37,16 +39,8 @@ set(PGO "none" CACHE STRING "Profile-guided optimization (generate/use/none)")
 set(LOG_LEVEL "warn" CACHE STRING "Logging level (none/error/warn/info/reorder/trace/cc)") 
 cmake_dependent_option(LTO "Use link time optimization" ON "PERF" OFF)
 
-# Parse the user-exposed options
-if(PERF)
-  message(STATUS "Compilation optimized for performance.")
-  set(DEBUG OFF)
-  set(TESTING OFF)
-else(PERF)
-  message(STATUS "Compilation not optimized for performance.")
-  set(DEBUG ON)
-  set(TESTING ON)
-endif(PERF)
+set(DEBUG OFF)
+set(TESTING OFF)
 
 # Profile-guided optimization
 if(PGO STREQUAL "generate")
